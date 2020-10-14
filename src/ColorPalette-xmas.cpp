@@ -37,15 +37,14 @@ STATE cstate = BLANK,
       nstate = RED;
 
 void advance_state() {
-    cstate = nstate;
     switch(cstate) {
             case RED:
                     leds[current_led_idx] = CRGB::Black;
-                    current = (current + 1) % NUM_LEDS;
+                    current_led_idx = (current_led_idx + 1) % NUM_LEDS;
 
 		    edge(CRGB::Red, GREEN);
             case GREEN:
-		    edge(CRGB::Red, BLUE);
+		    edge(CRGB::Green, BLUE);
             case BLUE:
 		    edge(CRGB::Blue, WHITE);
 	    case WHITE:
@@ -60,10 +59,55 @@ void advance_state() {
 		    nstate = RED;
 		    break;
 	}	
+    cstate = nstate;
 }
 
-void check_commands() {
+#define handle_cmd() {Serial.read();}
 
+void check_commands() {
+  uint16_t available = Serial.available();
+
+  if (available >= 1) {
+	  uint8_t cmd = Serial.peek();
+
+	  switch(cmd) {
+		  case CMD_DEBUG_POS:
+			 if (available >= 3) {
+				 handle_cmd();
+				 uint8_t high, low;
+				 high = Serial.read();
+				 low = Serial.read();
+
+				 uint16_t position = (high << 8) + low;
+				 
+				 if (position >= NUM_LEDS) {
+					 Serial.println("Position beyond leds, ignoring");
+				 } else {
+					 // position set, blank it, get ready to advance
+					 leds[current_led_idx] = CRGB::Black;
+					 current_led_idx = position;
+					 cstate = BLANK;
+					 nstate = RED;
+				 }
+			 } else {
+				 Serial.println("Partial debug pos command in buffer");
+			 }
+		  case CMD_DEBUG_ADV:
+			 // simple command advance the state one step
+			 handle_cmd();
+			 advance_state();
+			 break;
+		  case CMD_DEBUG_BLANK:
+			 handle_cmd();
+			 memset(leds, CRGB::Black, NUM_LEDS);
+			 break;
+		  default:
+		  Serial.println("Bad command in buffer, skipping");
+		  handle_cmd();
+	  }
+
+
+  }
 }
 
 void setup() {
@@ -75,9 +119,11 @@ void setup() {
     Serial.begin(115200);
 }
 
+uint32_t last_show_time = 0;
+
 void loop()
 {
-    advance_state();
+    check_commands();
 
-    FastLED.show();
+	    FastLED.show();
 }
