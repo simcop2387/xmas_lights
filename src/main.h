@@ -3,7 +3,7 @@
 
 #define LED_PIN     6
 #define LED_CLOCK   7
-#define NUM_LEDS    1024
+#define NUM_LEDS    600
 #define BRIGHTNESS  64
 #define LED_TYPE    WS2801
 #define COLOR_ORDER RGB
@@ -14,6 +14,7 @@ extern CRGB led_buffer[];
 
 enum MODE : uint8_t {
 	DEMO,
+	DEMO_SPECIFIC,
 	DEBUG,
 	RAW, // don't do any pixel updates ourselves
 };
@@ -22,6 +23,8 @@ extern MODE current_mode;
 
 void demo_setup();
 void demo_loop();
+void demo_specific_setup(uint8_t mode);
+void demo_specific_loop();
 
 void debug_setup(uint16_t position);
 void debug_loop();

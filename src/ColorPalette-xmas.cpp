@@ -37,6 +37,9 @@ void loop()
 	    case DEMO:
 		    demo_loop();
 		    break;
+	    case DEMO_SPECIFIC:
+		    demo_specific_loop();
+		    break;
 	    case DEBUG:
 		    debug_loop();
 		    break;

@@ -1,6 +1,12 @@
 #include <FastLED.h>
 #include "main.h"
 
+#include <RingBuf.h>
+
+RingBuf<uint8_t, 2048> serial_data;
+
+uint16_t buffer_position = 0;
+
 enum SERIAL_COMMANDS : uint8_t {
   // raw mode commands
   // Puts us into raw mode, and blank the strand
@@ -8,10 +14,10 @@ enum SERIAL_COMMANDS : uint8_t {
   // commands to start a drawing session
   CMD_PIXELS_START_DATA = 0x02, // give a position in the strand, start loading bulk data
   CMD_PIXELS_DATA = 0x03,
-  CMD_PIXELS_DATA_PARTIAL = 0x04,
+  CMD_PIXELS_DATA_PARTIAL = 0x04, // left for later todo
   CMD_PIXELS_SET_SINGLE = 0x05,
   // Commit the leds, copy the buffer
-  CMD_PIXELS_END = 0x06,
+  CMD_PIXELS_COMMIT = 0x06,
 
   
   CMD_DEMO_MODE = 0x70,
@@ -24,26 +30,35 @@ enum SERIAL_COMMANDS : uint8_t {
   CMD_DEBUG_BLANK = 0xFF
 };
 
-#define handle_cmd() {Serial.read();}
-
 void check_commands() {
-  uint16_t available = Serial.available();
+	// TODO make this stop reading when the ring is full
+	uint8_t temp;
+  size_t ready = Serial.available();
+  if (ready > 0) {
+    while(ready > 0) {
+      ready--;
+
+      serial_data.push(Serial.read());
+    }
+  }
+
+  uint16_t available = serial_data.size();
 
   if (available >= 1) {
-	  uint8_t cmd = Serial.peek();
+	  uint8_t cmd = serial_data[0];
 
 	  switch(cmd) {
 		  case CMD_DEBUG_POS:
 			 if (available >= 3) {
-				 handle_cmd();
+				 serial_data.pop(temp);
 				 uint8_t high, low;
-				 high = Serial.read();
-				 low = Serial.read();
+				 serial_data.pop(high);
+				 serial_data.pop(low);
 
 				 uint16_t position = (high << 8) + low;
 				 
 				 if (position >= NUM_LEDS) {
-					 Serial.println("Position beyond leds, ignoring");
+					 Serial.println("Position beyond leds, ixmas_lightsgnoring");
 				 } else {
 					 debug_setup(position);
 				 }
@@ -52,18 +67,106 @@ void check_commands() {
 			 }
 		  case CMD_DEBUG_ADV:
 			 // simple command advance the state one step
-			 handle_cmd();
+			 serial_data.pop(temp);
 			 advance_debug_state();
 			 break;
 		  case CMD_DEBUG_BLANK:
-			 handle_cmd();
+			 serial_data.pop(temp);
 			 blank_leds();
 			 break;
+
+		  case CMD_DEMO_MODE:
+			 serial_data.pop(temp);
+			 current_mode = DEMO;
+			 demo_setup();
+			 break;
+
+		  case CMD_DEMO_SPECIFIC:
+			 if (available >= 2) {
+				 serial_data.pop(temp);
+				 uint8_t mode;
+				 serial_data.pop(mode);
+				 current_mode = DEMO_SPECIFIC;
+				 demo_specific_setup(mode);
+			 }
+			 break;
+
+		  case CMD_PIXELS_RAW_START:
+			 serial_data.pop(temp);
+			 current_mode = RAW;
+			 blank_leds();
+			 blank_led_buffer();
+			 break;
+
+		  case CMD_PIXELS_START_DATA:
+			 if (available >= 3) {
+				 serial_data.pop(temp);
+				 uint8_t high, low;
+				 serial_data.pop(high);
+				 serial_data.pop(low);
+
+				 buffer_position = (high << 8) + low;
+			 }
+			 break;
+
+		  case CMD_PIXELS_DATA:
+			 // this uses the full default buffer from an arduino
+			 // it then consumes the whole buffer
+			 if (available >= 64) {
+				 serial_data.pop(temp);
+
+					// TODO make this use memcpy instead
+				 for (uint8_t i = 0; i < 64; i++) {
+					 // don't write past the buffer, but go ahead and 
+					 uint8_t r,g,b;
+
+					 serial_data.pop(r);
+					 serial_data.pop(g);
+					 serial_data.pop(b);
+
+					 if (buffer_position < NUM_LEDS) {
+						 led_buffer[buffer_position].r = r;
+						 led_buffer[buffer_position].g = g;
+						 led_buffer[buffer_position].b = b;
+
+						 buffer_position++;
+					 }
+				 }
+			 }
+			 break;
+
+		  case CMD_PIXELS_SET_SINGLE:
+			if (available >= 6) {
+				serial_data.pop(temp);
+
+				uint8_t high, low;
+				serial_data.pop(high);
+				serial_data.pop(low);
+
+				uint16_t position = (high << 8) + low;
+
+				uint8_t r,g,b;
+
+				serial_data.pop(r);
+				serial_data.pop(g);
+				serial_data.pop(b);
+
+				if (position < NUM_LEDS) {
+					led_buffer[position].r = r;
+					led_buffer[position].g = g;
+					led_buffer[position].b = b;
+				}
+			}
+			break;
+
+		  case CMD_PIXELS_COMMIT:
+			serial_data.pop(temp);
+			memcpy(leds, led_buffer, NUM_LEDS);
+			break;
+
 		  default:
 		  Serial.println("Bad command in buffer, skipping");
-		  handle_cmd();
+		  serial_data.pop(temp);
 	  }
-
-
   }
 }

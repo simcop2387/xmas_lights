@@ -80,23 +80,21 @@ void SetupRedAndGreenPalette()
 const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM =
 {
     CRGB::Red,
-    CRGB::Black, // 'white' is too bright compared to red and blue
-    CRGB::Green,
-    CRGB::Black,
-    
-    CRGB::Red,
-    CRGB::Black,
-    CRGB::Green,
-    CRGB::Black,
-    
     CRGB::Red,
     CRGB::Red,
     CRGB::Black,
+    CRGB::White, // 'white' is too bright compared to red and blue
+    CRGB::White, // 'white' is too bright compared to red and blue
+    CRGB::White, // 'white' is too bright compared to red and blue
     CRGB::Black,
-    CRGB::Green,
-    CRGB::Green,
+    CRGB::Blue,
+    CRGB::Blue,
+    CRGB::Blue,
     CRGB::Black,
-    CRGB::Black
+    CRGB::Red,
+    CRGB::White, // 'white' is too bright compared to red and blue
+    CRGB::Blue,
+    CRGB::Black,
 };
 
 
@@ -116,13 +114,15 @@ void ChangePalettePeriodically()
     
     if( lastSecond != secondHand) {
         lastSecond = secondHand;
-        if( secondHand ==  0)  { currentPalette = RainbowColors_p;         currentBlending = LINEARBLEND; }
-        if( secondHand == 90)  { currentPalette = RainbowStripeColors_p;   currentBlending = LINEARBLEND; }
-        if( secondHand == 120)  { SetupRedAndGreenPalette();             currentBlending = LINEARBLEND; }
-        if( secondHand == 210)  { SetupBlackAndWhiteStripedPalette();       currentBlending = LINEARBLEND; }
-        if( secondHand == 240)  { currentPalette = CloudColors_p;           currentBlending = LINEARBLEND; }
-        if( secondHand == 270)  { currentPalette = PartyColors_p;           currentBlending = LINEARBLEND; }
-        if( secondHand == 330)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = LINEARBLEND; }
+
+	demo_specific_setup(0x00);
+        if( secondHand ==  0)   { demo_specific_setup(0x00); }
+        if( secondHand == 90)   { demo_specific_setup(0x01); }
+        if( secondHand == 120)  { demo_specific_setup(0x02); }
+        if( secondHand == 210)  { demo_specific_setup(0x03); }
+        if( secondHand == 240)  { demo_specific_setup(0x04); }
+        if( secondHand == 270)  { demo_specific_setup(0x05); }
+        if( secondHand == 330)  { demo_specific_setup(0x06); }
     }
 }
 
@@ -159,6 +159,72 @@ void demo_loop() {
     EVERY_N_MILLISECONDS(1000 / UPDATES_PER_SECOND) {
 	    ChangePalettePeriodically();
 	    
+	    static uint8_t startIndex = 0;
+	    startIndex = startIndex + 1; /* motion speed */
+	    
+	    FillLEDsFromPaletteColors( startIndex);
+    }
+}
+
+void demo_specific_setup(uint8_t mode) {
+    FastLED.setBrightness( BRIGHTNESS );
+
+    switch(mode) {
+	    case 0x00:
+		    currentPalette = RainbowColors_p;
+    		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x01:
+		    currentPalette = RainbowStripeColors_p;
+    		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x02:
+        	    SetupRedAndGreenPalette();
+    		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x03:
+		    SetupBlackAndWhiteStripedPalette();
+    		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x04:
+		    currentPalette = CloudColors_p;
+    		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x05:
+		    currentPalette = PartyColors_p;
+    		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x06: // TODO add more power taps so I can do this one at full bright
+		    FastLED.setBrightness( 2 * BRIGHTNESS / 3);
+		    currentPalette = myRedWhiteBluePalette_p;
+    		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x07: // TODO see above
+		    FastLED.setBrightness( 2 * BRIGHTNESS / 3);
+		    currentPalette = HeatColors_p;
+		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x08:
+		    currentPalette = OceanColors_p;
+		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x09:
+		    currentPalette = LavaColors_p;
+		    currentBlending = LINEARBLEND;
+		    break;
+	    case 0x0A:
+		    currentPalette = ForestColors_p;
+		    currentBlending = LINEARBLEND;
+		    break;
+
+	    default:
+		    SetupRedAndGreenPalette();
+    		    currentBlending = LINEARBLEND;
+    }
+}
+
+void demo_specific_loop() {
+    EVERY_N_MILLISECONDS(1000 / UPDATES_PER_SECOND) {
 	    static uint8_t startIndex = 0;
 	    startIndex = startIndex + 1; /* motion speed */
 	    
